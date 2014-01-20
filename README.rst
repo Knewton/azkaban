@@ -10,18 +10,15 @@ Lightweight command line interface (CLI) for Azkaban_:
 Installation
 ------------
 
-Using pip_:
-
-.. code:: bash
-
-  $ pip install azkaban
+Build from source:
+:code:`python setup.py install`
 
 
 Quickstart
 ----------
 
-We first create a configuration file for our project. Let's call it 
-:code:`jobs.py`, although any name would work. Here's a simple example of how 
+We first create a configuration file for our project. Let's call it
+:code:`jobs.py`, although any name would work. Here's a simple example of how
 we could define a project with a single job and static file:
 
 .. code:: python
@@ -35,36 +32,36 @@ we could define a project with a single job and static file:
   if __name__ == '__main__':
     project.main()
 
-The :code:`add_file` method adds a file to the project archive (the second 
-optional argument specifies the destination path inside the zip file). The 
-:code:`add_job` method will trigger the creation of a :code:`.job` file. The 
-first argument will be the file's name, the second is a :code:`Job` instance 
+The :code:`add_file` method adds a file to the project archive (the second
+optional argument specifies the destination path inside the zip file). The
+:code:`add_job` method will trigger the creation of a :code:`.job` file. The
+first argument will be the file's name, the second is a :code:`Job` instance
 (cf. `Job options`_).
 
 Once we've saved our jobs file, the following commands are available to us:
 
-* :code:`python jobs.py list`, see the list of all jobs in the current 
+* :code:`python jobs.py list`, see the list of all jobs in the current
   project.
-* :code:`python jobs.py view`, view the contents of the :code:`.job` file for 
+* :code:`python jobs.py view`, view the contents of the :code:`.job` file for
   a given job.
-* :code:`python jobs.py build`, build the project archive and store it 
+* :code:`python jobs.py build`, build the project archive and store it
   locally.
-* :code:`python jobs.py upload`, build and upload the project to an Azkaban 
+* :code:`python jobs.py upload`, build and upload the project to an Azkaban
   server.
 
-Running :code:`python jobs.py --help` shows the list of options for each of 
+Running :code:`python jobs.py --help` shows the list of options for each of
 the previous commands.
 
 
 Job options
 -----------
 
-The :code:`Job` class is a light wrapper which allows the creation of 
+The :code:`Job` class is a light wrapper which allows the creation of
 :code:`.job` files using python dictionaries.
 
-It also provides a convenient way to handle options shared across multiple 
-jobs: the constructor can take in multiple options dictionaries and the last 
-definition of an option (i.e. later in the arguments) will take precedence 
+It also provides a convenient way to handle options shared across multiple
+jobs: the constructor can take in multiple options dictionaries and the last
+definition of an option (i.e. later in the arguments) will take precedence
 over earlier ones.
 
 We can use this to efficiently share default options among jobs, for example:
@@ -80,10 +77,10 @@ We can use this to efficiently share default options among jobs, for example:
     Job(defaults, {'type': 'command', 'command': 'ls -l', 'retries': 1}),
   ]
 
-All jobs except the first one will have their :code:`user.to.proxy` property 
+All jobs except the first one will have their :code:`user.to.proxy` property
 set. Note also that the last job overrides the :code:`retries` property.
 
-Alternatively, if we really don't want to pass the defaults dictionary around, 
+Alternatively, if we really don't want to pass the defaults dictionary around,
 we can create a new :code:`Job` subclass to do it for us:
 
 .. code:: python
@@ -100,8 +97,8 @@ More
 Aliases
 *******
 
-To avoid having to enter the server's URL and our username on every upload (or 
-hard-coding it into our project's configuration file, ugh), we can define 
+To avoid having to enter the server's URL and our username on every upload (or
+hard-coding it into our project's configuration file, ugh), we can define
 aliases in :code:`~/.azkabanrc`:
 
 .. code:: cfg
@@ -118,7 +115,7 @@ We can now upload directly to each of these URLs with the shorthand:
 
   $ python jobs.py upload -a foo
 
-This has the added benefit that we won't have to authenticate on every upload. 
+This has the added benefit that we won't have to authenticate on every upload.
 The session ID is cached and reused for later connections.
 
 
@@ -146,9 +143,9 @@ Nested dictionaries can be used to group options concisely:
 Pig jobs
 ********
 
-Because pig jobs are so common, a :code:`PigJob` class is provided which 
-accepts a file path (to the pig script) as first constructor argument, 
-optionally followed by job options. It then automatically sets the job type 
+Because pig jobs are so common, a :code:`PigJob` class is provided which
+accepts a file path (to the pig script) as first constructor argument,
+optionally followed by job options. It then automatically sets the job type
 and adds the corresponding script file to the project.
 
 .. code:: python
@@ -157,7 +154,7 @@ and adds the corresponding script file to the project.
 
   project.add_job('baz', PigJob('/.../baz.pig', {'dependencies': 'bar'}))
 
-Using a custom pig type is as simple as changing the :code:`PigJob.type` class 
+Using a custom pig type is as simple as changing the :code:`PigJob.type` class
 variable.
 
 Merging projects
@@ -188,9 +185,9 @@ retain its original name.
 Next steps
 **********
 
-Any valid python code can go inside the jobs configuration file. This includes 
-using loops to add jobs, subclassing the base :code:`Job` class to better suit 
-a project's needs (e.g. by implementing the :code:`on_add` and 
+Any valid python code can go inside the jobs configuration file. This includes
+using loops to add jobs, subclassing the base :code:`Job` class to better suit
+a project's needs (e.g. by implementing the :code:`on_add` and
 :code:`on_build` handlers), ...
 
 
