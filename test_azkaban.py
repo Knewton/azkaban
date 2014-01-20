@@ -38,9 +38,10 @@ class TestProject(object):
   def test_missing_file(self):
     self.project.add_file('bar')
 
-  @raises(AzkabanError)
-  def test_relative_file(self):
-    self.project.add_file(relpath(__file__))
+  # ommitted because its counter to need.
+  # @raises(AzkabanError)
+  # def test_relative_file(self):
+  #   self.project.add_file(relpath(__file__))
 
   def test_add_duplicate_file(self):
     self.project.add_file(__file__)
@@ -60,6 +61,15 @@ class TestProject(object):
     job = OtherJob()
     self.project.add_job('bar', job)
     eq_(job.test, ('foo', 'bar'))
+
+  def test_add_job_with_path(self):
+    class OtherPathJob(Job):
+      test = None
+      def on_add(self, project, name, path):
+        self.test = (project.name, name, 'path')
+    job = OtherPathJob()
+    self.project.add_job('bar', job, 'path')
+    eq_(job.test, ('path/foo', 'bar'))
 
   @raises(AzkabanError)
   def test_add_duplicate_job(self):

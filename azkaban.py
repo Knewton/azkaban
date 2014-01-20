@@ -124,6 +124,15 @@ def get_formatted_stream_handler():
   handler.setFormatter(formatter)
   return handler
 
+def format_archive_path(name, archive_path):
+  """return formatted archive path."""        
+  if archive_path != '' and archive_path is not None:
+    archive_path = archive_path + '/' + name
+  else:
+      archive_path = name
+  print archive_path
+  return archive_path
+
 @contextmanager
 def temppath():
   """Create a temporary filepath.
@@ -165,6 +174,7 @@ class Project(object):
     self.name = name
     self._jobs = {}
     self._files = {}
+    self._map = {}
 
   def add_file(self, path, archive_path=None):
     """Include a file in the project archive.
@@ -172,14 +182,14 @@ class Project(object):
     :param path: absolute path to file
     :param archive_path: path to file in archive (defaults to same as `path`)
 
-    This method requires the path to be absolute to avoid having files in the
-    archive with lower level destinations than the base root directory.
+    # This method requires the path to be absolute to avoid having files in the
+    # archive with lower level destinations than the base root directory.
 
     """
     logger.debug('adding file %r as %r', path, archive_path or path)
-    if not isabs(path):
-      raise AzkabanError('relative path not allowed %r' % (path, ))
-    elif path in self._files:
+    # if not isabs(path):
+    #   raise AzkabanError('relative path not allowed %r' % (path, ))
+    if path in self._files:
       if self._files[path] != archive_path:
         raise AzkabanError('inconsistent duplicate %r' % (path, ))
     else:
@@ -187,11 +197,13 @@ class Project(object):
         raise AzkabanError('missing file %r' % (path, ))
       self._files[path] = archive_path
 
-  def add_job(self, name, job):
+  def add_job(self, name, job, archive_path = None):
     """Include a job in the project.
 
     :param name: name assigned to job (must be unique)
     :param job: `Job` subclass
+    :param archive_path: path to store job in archive. 
+      Used for heirarchical organization including multiple .properties files
 
     This method triggers the `on_add` method on the added job (passing the
     project and name as arguments). The handler will be called right after the
@@ -203,6 +215,7 @@ class Project(object):
       raise AzkabanError('duplicate job name %r' % (name, ))
     else:
       self._jobs[name] = job
+      self._map[name] = archive_path
       job.on_add(self, name)
 
   def merge(self, project):
@@ -231,6 +244,7 @@ class Project(object):
 
     """
     logger.debug('building project')
+    logger.debug('path is: ' + path)
     # not using a with statement for compatibility with older python versions
     if exists(path) and not force:
       raise AzkabanError('path %r already exists' % (path, ))
@@ -240,9 +254,13 @@ class Project(object):
     try:
       for name, job in self._jobs.items():
         job.on_build(self, name)
+        # return job mapped path
+        map_path = self._map[name]
+        job_path = job.build_options.get('path', '')
+        arch_path = format_archive_path(name, job_path)
         with temppath() as fpath:
           job.build(fpath)
-          writer.write(fpath, '%s.job' % (name, ))
+          writer.write(fpath, '%s.job' % (arch_path, ))
       for fpath, apath in self._files.items():
         writer.write(fpath, apath)
     finally:
@@ -300,11 +318,13 @@ class Project(object):
     argv.insert(0, 'FILE')
     args = docopt(__doc__, version=__version__)
     if not args['--quiet']:
-      logger.setLevel(logging.INFO)
+      logger.setLevel(logging.DEBUG)
       logger.addHandler(get_formatted_stream_handler())
     try:
       if args['build']:
-        self.build(args['PATH'], force=args['--force'])
+        self.build(args['PATH'],
+          force=args['--force']
+          )
       elif args['upload']:
         self.upload(
           url=args['URL'],
@@ -319,16 +339,30 @@ class Project(object):
         else:
           raise AzkabanError('missing job %r' % (job_name, ))
       elif args['list']:
-        jobs = defaultdict(list)
+        proj = defaultdict(list)
+        formatted_name = ''
         for name, job in self._jobs.items():
           job_type = job.build_options.get('type', '--')
           job_deps = job.build_options.get('dependencies', '')
+          job_path = job.build_options.get('path', '')
+          formatted_name = format_archive_path(name,job_path)
           if job_deps:
-            info = '%s [%s]' % (name, job_deps)
+            info = '%s [%s]' % (formatted_name, job_deps)
           else:
-            info = name
-          jobs[job_type].append(info)
-        pretty_print(jobs)
+            info = formatted_name
+          proj[job_type].append(info)
+        # now list files
+        if len(self._files.items()) > 0: 
+          proj["file"] = []
+        else:
+          proj["file"] = None
+
+        for fpath, apath in self._files.items():
+          file_formatted_name = format_archive_path(fpath, apath)
+          logger.debug(file_formatted_name)
+          proj["file"].append(file_formatted_name)
+
+        pretty_print(proj)
     except AzkabanError as err:
       logger.error(err)
       exit(1)
@@ -388,7 +422,6 @@ class Project(object):
             with open(self.rcpath, 'w') as writer:
               parser.write(writer)
     return (url, session_id)
-
 
 class Job(object):
 
