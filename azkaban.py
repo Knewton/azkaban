@@ -271,6 +271,8 @@ class Project(object):
       for fpath, apath in self._files.items():
         ffile = open(fpath)
         lines = ffile.read();
+        # Replace strings with the following format ##property## with the property
+        # value in the config yaml.
         pattern = re.compile('##' + '##|##'.join(properties.keys()) + '##')
         replaced_str = pattern.sub(lambda x: properties[x.group()[2:-2]], lines)
         writer.writestr(apath, replaced_str)
@@ -303,7 +305,7 @@ class Project(object):
           data={
             'ajax': 'upload',
             'session.id': session_id,
-            'project': self.name + '_' + environment,
+            'project': '%s_%s' % (self.name, environment),
           },
           files={
             'file': ('file.zip', open(path, 'rb'), 'application/zip'),
