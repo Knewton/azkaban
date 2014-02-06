@@ -43,9 +43,10 @@ from os import close, remove
 from os.path import exists, expanduser, getsize, isabs, join
 from sys import argv, exit, stdout
 from tempfile import mkstemp
-from re import compile
 from yaml import load
 from zipfile import ZipFile
+
+import re
 
 try:
   from docopt import docopt
@@ -270,7 +271,7 @@ class Project(object):
       for fpath, apath in self._files.items():
         ffile = open(fpath)
         lines = ffile.read();
-        pattern = compile('##' + '##|##'.join(properties.keys()) + '##')
+        pattern = re.compile('##' + '##|##'.join(properties.keys()) + '##')
         replaced_str = pattern.sub(lambda x: properties[x.group()[2:-2]], lines)
         writer.writestr(apath, replaced_str)
     finally:
