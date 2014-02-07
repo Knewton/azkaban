@@ -24,6 +24,7 @@ setup(
     install_requires=[
       'docopt',
       'requests>=2.0.1',
+      'PyYAML',
     ],
     # entry_points={'console_scripts': []},
 )

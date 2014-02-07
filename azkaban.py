@@ -4,8 +4,8 @@
 """Azkaban CLI.
 
 Usage:
-  python FILE upload [-q] (-a ALIAS | [-u USER] URL)
-  python FILE build [-fq] PATH
+  python FILE upload [-q] -e ENV (-a ALIAS | [-u USER] URL)
+  python FILE build [-fq] -e ENV PATH
   python FILE view JOB
   python FILE list
   python FILE -h | --help | -v | --version
@@ -25,6 +25,7 @@ Arguments:
 Options:
   -a ALIAS --alias=ALIAS        Alias to saved URL and username. Will also try
                                 to reuse session IDs for later connections.
+  -e ENV --environment=ENV      Environment this workflow is being deployed to.
   -f --force                    Overwrite any existing file.
   -h --help                     Show this message and exit.
   -q --quiet                    Suppress output.
@@ -39,10 +40,13 @@ from ConfigParser import RawConfigParser
 from contextlib import contextmanager
 from getpass import getpass, getuser
 from os import close, remove
-from os.path import exists, expanduser, getsize, isabs
+from os.path import exists, expanduser, getsize, isabs, join
 from sys import argv, exit, stdout
 from tempfile import mkstemp
+from yaml import load
 from zipfile import ZipFile
+
+import re
 
 try:
   from docopt import docopt
@@ -130,7 +134,6 @@ def format_archive_path(name, archive_path):
     archive_path = archive_path + '/' + name
   else:
       archive_path = name
-  print archive_path
   return archive_path
 
 @contextmanager
@@ -170,11 +173,12 @@ class Project(object):
 
   rcpath = expanduser('~/.azkabanrc')
 
-  def __init__(self, name):
+  def __init__(self, name, project_root_path):
     self.name = name
     self._jobs = {}
     self._files = {}
     self._map = {}
+    self.project_root_path = project_root_path
 
   def add_file(self, path, archive_path=None):
     """Include a file in the project archive.
@@ -186,9 +190,11 @@ class Project(object):
     # archive with lower level destinations than the base root directory.
 
     """
+    if not isabs(path):
+        path = join(self.project_root_path, path)
     logger.debug('adding file %r as %r', path, archive_path or path)
-    # if not isabs(path):
-    #   raise AzkabanError('relative path not allowed %r' % (path, ))
+    if not isabs(path):
+      raise AzkabanError('relative path not allowed %r' % (path, ))
     if path in self._files:
       if self._files[path] != archive_path:
         raise AzkabanError('inconsistent duplicate %r' % (path, ))
@@ -233,11 +239,11 @@ class Project(object):
     for path, archive_path in project._files.items():
       self.add_file(path, archive_path)
 
-  def build(self, path, force=False):
+  def build(self, path, environment, force=False):
     """Create the project archive.
 
     :param path: destination path
-
+    :param environment The environment
     Triggers the `on_build` method on each job inside the project (passing
     itself and the job's name as two argument). This method will be called
     right before the job file is generated.
@@ -251,6 +257,7 @@ class Project(object):
     if not (len(self._jobs) or len(self._files)):
       raise AzkabanError('building empty project')
     writer = ZipFile(path, 'w')
+    properties = self._read_property_file(environment)
     try:
       for name, job in self._jobs.items():
         job.on_build(self, name)
@@ -262,15 +269,22 @@ class Project(object):
           job.build(fpath)
           writer.write(fpath, '%s.job' % (arch_path, ))
       for fpath, apath in self._files.items():
-        writer.write(fpath, apath)
+        ffile = open(fpath)
+        lines = ffile.read();
+        # Replace strings with the following format ##property## with the property
+        # value in the config yaml.
+        pattern = re.compile('##' + '##|##'.join(properties.keys()) + '##')
+        replaced_str = pattern.sub(lambda x: properties[x.group()[2:-2]], lines)
+        writer.writestr(apath, replaced_str)
     finally:
       writer.close()
     size = human_readable(getsize(path))
     logger.info('project successfully built (size: %s)' % (size, ))
 
-  def upload(self, url=None, user=None, password=None, alias=None):
+  def upload(self, environment, url=None, user=None, password=None, alias=None):
     """Build and upload project to Azkaban.
 
+    :param environment: The environment to which the project will get deployed
     :param url: http endpoint URL (including protocol)
     :param user: Azkaban username (must have the appropriate permissions)
     :param password: Azkaban login password
@@ -291,7 +305,7 @@ class Project(object):
           data={
             'ajax': 'upload',
             'session.id': session_id,
-            'project': self.name,
+            'project': '%s_%s' % (self.name, environment),
           },
           files={
             'file': ('file.zip', open(path, 'rb'), 'application/zip'),
@@ -313,6 +327,15 @@ class Project(object):
           )
           return res
 
+  def _read_property_file(self, environment):
+    """Reads the configuration yaml from default locations 1) configuration dir in project dir
+    :param environment: Used to identify which yaml file to load
+    """
+    filename = environment + '.yml'
+    property_file=join(self.project_root_path, 'configuration', filename)
+    stream = file(property_file, 'r')
+    return load(stream)
+
   def main(self):
     """Command line argument parser."""
     argv.insert(0, 'FILE')
@@ -323,10 +346,12 @@ class Project(object):
     try:
       if args['build']:
         self.build(args['PATH'],
-          force=args['--force']
+          environment=args['--environment'],
+          force=args['--force'],
           )
       elif args['upload']:
         self.upload(
+          environment=args['--environment'],
           url=args['URL'],
           user=args['--user'],
           alias=args['--alias'],
