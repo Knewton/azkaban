@@ -43,7 +43,6 @@ from os import close, remove
 from os.path import exists, expanduser, getsize, isabs, join
 from sys import argv, exit, stdout
 from tempfile import mkstemp
-from yaml import load
 from zipfile import ZipFile
 
 import re
@@ -52,6 +51,7 @@ try:
   from docopt import docopt
   from requests import post, ConnectionError
   from requests.exceptions import MissingSchema
+  from yaml import load
 except ImportError:
   pass
 
