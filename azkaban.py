@@ -298,7 +298,7 @@ class Project(object):
     (url, session_id) = self._get_credentials(url, user, password, alias)
     logger.debug('uploading project to %r', url)
     with temppath() as path:
-      self.build(path)
+      self.build(path, environment)
       try:
         req = post(
           '%s/manager' % (url, ),
