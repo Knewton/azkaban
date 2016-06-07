@@ -310,8 +310,7 @@ class Project(object):
           files={
             'file': ('file.zip', open(path, 'rb'), 'application/zip'),
           },
-          auth=(self.ldap_username, self.ldap_password),
-          verify=True
+          verify=False
         )
       except ConnectionError:
         raise AzkabanError('unable to connect to azkaban server')
@@ -423,18 +422,15 @@ class Project(object):
     if not session_id or post(
       '%s/manager' % (url, ),
       {'session.id': session_id},
-      verify=True
+      verify=False
     ).text:
-      self.ldap_username = getuser()
-      self.ldap_password = getpass('ldap pass for %s: ' % (self.ldap_username, ))
       user = user or getuser()
       password = password or getpass('azkaban password for %s: ' % (user, ))
       try:
         req = post(
           url,
           data={'action': 'login', 'username': user, 'password': password},
-          auth=(self.ldap_username, self.ldap_password),
-          verify=True,
+          verify=False,
         )
       except ConnectionError:
         raise AzkabanError('unable to connect to azkaban server')
